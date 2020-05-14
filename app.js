@@ -6,6 +6,14 @@ const createError = require('http-errors');
 const logger = require('morgan');
 const sassMiddleware = require('node-sass-middleware');
 const serveFavicon = require('serve-favicon');
+const bindUserToLocal = require("./middleware/bind-user-to-view-locals")
+const expressSession = require("express-session");
+const connectMongo = require("connect-mongo");
+const mongoose = require("mongoose");
+const passport = require("passport");
+
+require("./configure-passport");
+
 
 const indexRouter = require('./routes/index');
 const authenticationRouter = require('./routes/authentication');
@@ -29,6 +37,29 @@ app.use(
 );
 app.use(serveFavicon(join(__dirname, 'public/images', 'favicon.ico')));
 app.use(express.static(join(__dirname, 'public')));
+
+app.use(
+  expressSession({
+    secret: process.env.SESSION_SECRET,
+    resave: true,
+    saveUninitialized: false,
+    cookie{
+      maxAge: 15 * 24 * 60 * 60 * 1000;
+      sameSite: "lax",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production"
+    },
+    store: new (connectMongo(expressSession))({
+      mongooseConnection: mongoose.connection,
+      ttl: 24 * 60 * 60
+    })
+  });
+);
+
+app.use(passport.initialize());
+app.use(passport.session);
+
+app.use(bindUserToLocal);
 
 app.use('/', indexRouter);
 app.use('/authentication', authenticationRouter);
